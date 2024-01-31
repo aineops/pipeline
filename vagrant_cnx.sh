@@ -3,8 +3,33 @@
 # Utiliser 'default' comme nom de la VM si aucun argument n'est fourni
 VM_NAME=${1:-default}
 
+# Listez toutes les box Vagrant installées
+box_list=$(vagrant box list)
+
 # Exécuter la commande 'vagrant global-status' pour obtenir une vue d'ensemble de la situation Vagrant
-echo "---- Vue d'ensemble Vagrant ----"
+echo "---- Vue d'ensemble Vagrant avant la suppression ----"
+vagrant global-status
+
+# Tableau pour stocker les noms des box déjà vus
+seen_names=()
+
+# Boucle à travers la liste des box et supprimez-les une par une
+while read -r box; do
+    name=$(echo "$box" | awk '{print $1}')
+    state=$(echo "$box" | awk '{print $4}')
+    
+    # Si nous avons déjà vu une box avec ce nom et qu'elle est en "poweroff", supprimez-la
+    if [[ " ${seen_names[@]} " =~ " ${name} " ]] && [[ "$state" == "poweroff" ]]; then
+        echo "Suppression de la box : $name"
+        vagrant box remove "$name" --all --force
+    fi
+
+    # Ajoutez le nom de la box au tableau des noms déjà vus
+    seen_names+=("$name")
+done <<< "$box_list"
+
+# Exécuter la commande 'vagrant global-status' après la suppression
+echo "---- Vue d'ensemble Vagrant après la suppression ----"
 vagrant global-status
 
 # Récupération du chemin de la clé privée, de l'adresse IP et du port SSH
