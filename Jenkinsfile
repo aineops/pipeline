@@ -12,7 +12,7 @@ pipeline {
             steps {
                 script {
                     sh 'cd dev-vagrant && vagrant up'
-                    sh 'cd ../preprod-vagrant && vagrant up'
+                    sh 'cd preprod-vagrant && vagrant up'
                 }
             }
         }
