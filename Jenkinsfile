@@ -21,7 +21,11 @@ pipeline {
             steps {
                 script {
                     // Utiliser le script pour se connecter à la VM dev-qa-box et cloner le dépôt
-                    sh './vagrant_cnx.sh dev-qa-box "git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
+                    sh 'AUTO_ACCEPT_SSH_KEY=true ../vagrant_cnx.sh dev-qa-box "git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
+
+                    // Sortir de la VM
+                    sh 'exit'
+
                     // Copier le fichier tests.py vers l'environnement Dev/QA
                     sh 'cd dev-vagrant && vagrant scp tests.py dev-qa-box:/app'
                 }
@@ -32,7 +36,7 @@ pipeline {
             steps {
                 script {
                     // Construire et tester dans l'environnement Dev/QA
-                    sh './vagrant_cnx.sh dev-qa-box "cd /app && ./mvnw clean package"'
+                    sh '../vagrant_cnx.sh dev-qa-box "cd /app && ./mvnw clean package"'
                 }
             }
         }
@@ -41,7 +45,7 @@ pipeline {
             steps {
                 script {
                     // Déployer dans l'environnement Dev/QA
-                    sh './vagrant_cnx.sh dev-qa-box "cd /app && docker-compose up -d"'
+                    sh '../vagrant_cnx.sh dev-qa-box "cd /app && docker-compose up -d"'
                 }
             }
         }
@@ -50,7 +54,7 @@ pipeline {
             steps {
                 script {
                     // Exécuter les tests Selenium dans l'environnement Dev/QA
-                    sh './vagrant_cnx.sh dev-qa-box "cd /app && python3 tests.py"'
+                    sh '../vagrant_cnx.sh dev-qa-box "cd /app && python3 tests.py"'
                 }
             }
         }
@@ -59,7 +63,7 @@ pipeline {
             steps {
                 script {
                     // Cloner le dépôt de l'application dans l'environnement de préproduction
-                    sh './vagrant_cnx.sh preprod-box "git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
+                    sh '../vagrant_cnx.sh preprod-box "git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
                 }
             }
         }
@@ -68,7 +72,7 @@ pipeline {
             steps {
                 script {
                     // Déployer dans l'environnement de préproduction
-                    sh './vagrant_cnx.sh preprod-box "cd /app && docker-compose up -d"'
+                    sh '../vagrant_cnx.sh preprod-box "cd /app && docker-compose up -d"'
                 }
             }
         }
@@ -87,6 +91,10 @@ pipeline {
         }
         failure {
             echo "Le pipeline a échoué !"
+            script {
+                sh 'cd dev-vagrant && vagrant halt'
+                sh 'cd preprod-vagrant && vagrant halt'
+            }
         }
     }
 }
