@@ -3,6 +3,10 @@
 # Utiliser 'default' comme nom de la VM si aucun argument n'est fourni
 VM_NAME=${1:-default}
 
+# Exécuter la commande 'vagrant global-status' pour obtenir une vue d'ensemble de la situation Vagrant
+echo "---- Vue d'ensemble Vagrant ----"
+vagrant global-status
+
 # Récupération du chemin de la clé privée, de l'adresse IP et du port SSH
 SSH_CONFIG=$(vagrant ssh-config $VM_NAME 2>/dev/null)
 if [ -z "$SSH_CONFIG" ]; then
