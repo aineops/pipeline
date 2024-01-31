@@ -26,5 +26,6 @@ Vagrant.configure("2") do |config|
     sudo chmod -R 777 /app
 
   SHELL
+  end
 end
 
