@@ -19,8 +19,12 @@ pipeline {
         stage('Setup Application in Dev/QA Environment') {
             steps {
                 script {
-                    // Utiliser le script pour se connecter à la VM dev-qa-box et cloner le dépôt
-                    sh 'git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app'
+
+                    // Remplacer par le script pour se connecter à la VM dev-qa-box et cloner le dépôt
+                    sh 'cd dev-vagrant && vagrant ssh -c "git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
+
+                    // // Utiliser le script pour se connecter à la VM dev-qa-box et cloner le dépôt
+                    // sh 'git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app'
                 }
             }
         }
@@ -49,7 +53,7 @@ pipeline {
             steps {
                 script {
                     // Télécharger le fichier tests.py depuis le référentiel GitHub
-                    sh 'curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py'
+                    sh 'cd /app && curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py'
 
                     def maxRetryCount = 30
                     def retryCount = 0
