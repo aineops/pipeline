@@ -75,27 +75,29 @@ pipeline {
         stage('Deploy to Dev/QA') {
             steps {
                 script {
-                sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo docker-compose up -d"'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo docker-compose up -d"'
 
-                // Attendre que tous les conteneurs soient "up and running"
-                sh '''
-                    MAX_WAIT=120  # Maximum wait time in seconds
-                    WAIT_INTERVAL=10  # Interval to wait between checks in seconds
-                    while [ $MAX_WAIT -gt 0 ]; do
-                        if docker-compose ps | grep -q "(healthy)"; then
-                            echo "Tous les conteneurs sont en état 'healthy'."
-                            break
+                    // Attendre que tous les conteneurs soient "up and running"
+                    sh '''
+                        cd dev-vagrant && vagrant ssh -c "
+                        MAX_WAIT=120  # Maximum wait time in seconds
+                        WAIT_INTERVAL=10  # Interval to wait between checks in seconds
+                        while [ \$MAX_WAIT -gt 0 ]; do
+                            if docker-compose ps | grep -q '(healthy)'; then
+                                echo 'Tous les conteneurs sont en état healthy.'
+                                break
+                            fi
+                            echo 'En attente des conteneurs... Reste \$MAX_WAIT secondes.'
+                            sleep \$WAIT_INTERVAL
+                            MAX_WAIT=\$((\$MAX_WAIT-\$WAIT_INTERVAL))
+                        done
+                        if [ \$MAX_WAIT -le 0 ]; then
+                            echo 'Timeout atteint. Tous les conteneurs ne sont pas up and running.'
+                            exit 1
                         fi
-                        echo "En attente des conteneurs... Reste $MAX_WAIT secondes."
-                        sleep $WAIT_INTERVAL
-                        MAX_WAIT=$(($MAX_WAIT-$WAIT_INTERVAL))
-                    done
-                    if [ $MAX_WAIT -le 0 ]; then
-                        echo "Timeout atteint. Tous les conteneurs ne sont pas 'up and running'."
-                        exit 1
-                    fi
-                '''
-            }
+                        "
+                    '''
+                }
             }
         }
 
