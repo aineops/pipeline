@@ -30,59 +30,83 @@ pipeline {
         }
 
         stage('Build and Unit Test in Dev/QA') {
-            steps {
-                script {
-                    // Construire et tester dans l'environnement Dev/QA
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo ./mvnw clean package"'
+        steps {
+            script {
+                sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo ./mvnw clean package"'
+                echo 'Build Maven et tests unitaires terminés.'
+
+                def services = ['spring-petclinic-admin-server', 'spring-petclinic-api-gateway', 
+                                'spring-petclinic-config-server', 'spring-petclinic-customers-service', 
+                                'spring-petclinic-discovery-server', 'spring-petclinic-vets-service', 
+                                'spring-petclinic-visits-service']
+
+                // Attendre la présence des fichiers JAR
+                services.each { service ->
+                    def jarPath = "/app/${service}/target/${service}-3.2.0.jar"
+                    def maxWait = 120 // Délai d'attente maximal en secondes
+                    def waitInterval = 10 // Intervalles de vérification en secondes
+
+                    echo "Vérification de la présence du fichier JAR pour ${service}..."
+                    while (true) {
+                        def jarExists = sh(script: "cd dev-vagrant && vagrant ssh -c '[ -f ${jarPath} ] && echo true || echo false'", returnStdout: true).trim()
+                        if (jarExists.toBoolean()) {
+                            echo "Fichier JAR trouvé pour ${service}."
+                            break
+                        }
+                        if (maxWait <= 0) {
+                            error "Le fichier JAR pour ${service} est manquant après le temps d'attente maximal."
+                        }
+                        sleep(waitInterval)
+                        maxWait -= waitInterval
+                    }
                 }
+
+                echo 'Tous les fichiers JAR sont présents et vérifiés.'
             }
         }
+    }
 
         stage('Deploy to Dev/QA') {
             steps {
                 script {
-                    // Déployer dans l'environnement Dev/QA
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo docker-compose up -d"'
+                sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo docker-compose up -d"'
 
-
-                }
+                // Attendre que tous les conteneurs soient "up and running"
+                sh '''
+                    MAX_WAIT=120  # Maximum wait time in seconds
+                    WAIT_INTERVAL=10  # Interval to wait between checks in seconds
+                    while [ $MAX_WAIT -gt 0 ]; do
+                        if docker-compose ps | grep -q "(healthy)"; then
+                            echo "Tous les conteneurs sont en état 'healthy'."
+                            break
+                        fi
+                        echo "En attente des conteneurs... Reste $MAX_WAIT secondes."
+                        sleep $WAIT_INTERVAL
+                        MAX_WAIT=$(($MAX_WAIT-$WAIT_INTERVAL))
+                    done
+                    if [ $MAX_WAIT -le 0 ]; then
+                        echo "Timeout atteint. Tous les conteneurs ne sont pas 'up and running'."
+                        exit 1
+                    fi
+                '''
+            }
             }
         }
 
         stage('Download & Run Selenium Tests') {
-            steps {
-                script {
-                    // Télécharger le fichier tests.py depuis le référentiel GitHub
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py"'
+        steps {
+            script {
+                // Télécharger le fichier tests.py depuis le référentiel GitHub
+                sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py"'
 
-                    def maxRetryCount = 30
-                    def retryCount = 0
-                    def curlExitCode = 0
+                // Exécuter les tests Selenium dans l'environnement Dev/QA
+                sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo python3 tests.py"'
 
-                    // Attendre que localhost:8080 soit accessible ou jusqu'à un certain nombre de tentatives
-                    while (retryCount < maxRetryCount) {
-                        // Utiliser curl pour vérifier la disponibilité de localhost:8080
-                        curlExitCode = sh(script: 'cd dev-vagrant && vagrant ssh -c "curl -s -o /dev/null -w "%{http_code}" http://localhost:8080"', returnStatus: true)
-                        if (curlExitCode == 200) {
-                            echo "localhost:8080 est accessible."
-                            break
-                        } else {
-                            echo "localhost:8080 n'est pas encore accessible. Tentative ${retryCount + 1}/${maxRetryCount}..."
-                            sleep(5) // Attendre 10 secondes avant la prochaine tentative
-                            retryCount++
-                        }
-                    }
-
-                    // Si la vérification échoue après un certain nombre de tentatives
-                    if (curlExitCode != 200) {
-                        error "localhost:8080 n'est pas accessible après ${maxRetryCount} tentatives."
-                    }
-
-                    // Exécuter les tests Selenium dans l'environnement Dev/QA
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo python3 tests.py"'
-                }
+                // Collecter les résultats des tests Selenium
+                junit 'test-reports/*.xml'
             }
         }
+    }
 
 
         stage('Setup Application in Preprod Environment') {
