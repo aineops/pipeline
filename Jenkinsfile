@@ -21,7 +21,7 @@ pipeline {
                 script {
 
                     // Remplacer par le script pour se connecter à la VM dev-qa-box et cloner le dépôt
-                    sh 'cd dev-vagrant && vagrant ssh -c "git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
+                    sh 'cd dev-vagrant && vagrant ssh -c "sudo git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
 
                     // // Utiliser le script pour se connecter à la VM dev-qa-box et cloner le dépôt
                     // sh 'git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app'
@@ -33,7 +33,7 @@ pipeline {
             steps {
                 script {
                     // Construire et tester dans l'environnement Dev/QA
-                    sh 'cd /app && ./mvnw clean package'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo ./mvnw clean package"'
                 }
             }
         }
@@ -42,7 +42,7 @@ pipeline {
             steps {
                 script {
                     // Déployer dans l'environnement Dev/QA
-                    sh 'cd /app && docker-compose up -d"'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo docker-compose up -d"'
 
 
                 }
