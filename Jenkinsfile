@@ -62,7 +62,7 @@ pipeline {
                     // Attendre que localhost:8080 soit accessible ou jusqu'à un certain nombre de tentatives
                     while (retryCount < maxRetryCount) {
                         // Utiliser curl pour vérifier la disponibilité de localhost:8080
-                        curlExitCode = sh(script: 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080', returnStatus: true)
+                        curlExitCode = sh(script: 'cd dev-vagrant && vagrant ssh -c "curl -s -o /dev/null -w "%{http_code}" http://localhost:8080"', returnStatus: true)
                         if (curlExitCode == 200) {
                             echo "localhost:8080 est accessible."
                             break
@@ -79,7 +79,7 @@ pipeline {
                     }
 
                     // Exécuter les tests Selenium dans l'environnement Dev/QA
-                    sh 'cd /app && sudo python3 tests.py'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo python3 tests.py"'
                 }
             }
         }
