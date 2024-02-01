@@ -12,7 +12,6 @@ pipeline {
             steps {
                 script {
                     sh 'cd dev-vagrant && vagrant up'
-                    sh 'cd preprod-vagrant && vagrant up'
                 }
             }
         }
@@ -21,13 +20,7 @@ pipeline {
             steps {
                 script {
                     // Utiliser le script pour se connecter à la VM dev-qa-box et cloner le dépôt
-                    sh 'AUTO_ACCEPT_SSH_KEY=true ./vagrant_cnx.sh dev-qa-box "git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
-
-                    // Sortir de la VM
-                    sh 'exit'
-
-                    // Copier le fichier tests.py vers l'environnement Dev/QA
-                    sh 'cd dev-vagrant && vagrant scp tests.py dev-qa-box:/app'
+                    sh 'git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app'
                 }
             }
         }
@@ -36,7 +29,7 @@ pipeline {
             steps {
                 script {
                     // Construire et tester dans l'environnement Dev/QA
-                    sh './vagrant_cnx.sh dev-qa-box "cd /app && ./mvnw clean package"'
+                    sh 'cd /app && ./mvnw clean package'
                 }
             }
         }
@@ -45,25 +38,56 @@ pipeline {
             steps {
                 script {
                     // Déployer dans l'environnement Dev/QA
-                    sh './vagrant_cnx.sh dev-qa-box "cd /app && docker-compose up -d"'
+                    sh 'cd /app && docker-compose up -d"'
+
+
                 }
             }
         }
 
-        stage('Run Selenium Tests') {
+        stage('Download && Run Selenium Tests') {
             steps {
                 script {
+                    // Télécharger le fichier tests.py depuis le référentiel GitHub
+                    sh 'curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py'
+
+                    def maxRetryCount = 30
+                    def retryCount = 0
+                    def curlExitCode = 0
+
+                    // Attendre que localhost:8080 soit accessible ou jusqu'à un certain nombre de tentatives
+                    while (retryCount < maxRetryCount) {
+                        // Utiliser curl pour vérifier la disponibilité de localhost:8080
+                        curlExitCode = sh(script: 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080', returnStatus: true)
+                        if (curlExitCode == 200) {
+                            echo "localhost:8080 est accessible."
+                            break
+                        } else {
+                            echo "localhost:8080 n'est pas encore accessible. Tentative ${retryCount + 1}/${maxRetryCount}..."
+                            sleep(5) // Attendre 10 secondes avant la prochaine tentative
+                            retryCount++
+                        }
+                    }
+
+                    // Si la vérification échoue après un certain nombre de tentatives
+                    if (curlExitCode != 200) {
+                        error "localhost:8080 n'est pas accessible après ${maxRetryCount} tentatives."
+                    }
+
                     // Exécuter les tests Selenium dans l'environnement Dev/QA
-                    sh './vagrant_cnx.sh dev-qa-box "cd /app && python3 tests.py"'
+                    sh 'cd /app && python3 tests.py'
                 }
             }
         }
+
 
         stage('Setup Application in Preprod Environment') {
             steps {
                 script {
+                    sh 'exit'
+                    sh 'cd preprod-vagrant && vagrant up'
                     // Cloner le dépôt de l'application dans l'environnement de préproduction
-                    sh './vagrant_cnx.sh preprod-box "git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
+                    sh 'git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app'
                 }
             }
         }
@@ -71,8 +95,9 @@ pipeline {
         stage('Deploy to Preprod') {
             steps {
                 script {
+
                     // Déployer dans l'environnement de préproduction
-                    sh './vagrant_cnx.sh preprod-box "cd /app && docker-compose up -d"'
+                    sh 'cd /app && docker-compose up -d'
                 }
             }
         }
