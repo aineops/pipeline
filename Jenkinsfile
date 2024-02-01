@@ -49,11 +49,11 @@ pipeline {
             }
         }
 
-        stage('Download && Run Selenium Tests') {
+        stage('Download & Run Selenium Tests') {
             steps {
                 script {
                     // Télécharger le fichier tests.py depuis le référentiel GitHub
-                    sh 'cd /app && curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py"'
 
                     def maxRetryCount = 30
                     def retryCount = 0
@@ -79,7 +79,7 @@ pipeline {
                     }
 
                     // Exécuter les tests Selenium dans l'environnement Dev/QA
-                    sh 'cd /app && python3 tests.py'
+                    sh 'cd /app && sudo python3 tests.py'
                 }
             }
         }
@@ -88,10 +88,9 @@ pipeline {
         stage('Setup Application in Preprod Environment') {
             steps {
                 script {
-                    sh 'exit'
                     sh 'cd preprod-vagrant && vagrant up'
                     // Cloner le dépôt de l'application dans l'environnement de préproduction
-                    sh 'git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app'
+                    sh 'cd preprod-vagrant && vagrant ssh -c "sudo git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
                 }
             }
         }
@@ -101,7 +100,7 @@ pipeline {
                 script {
 
                     // Déployer dans l'environnement de préproduction
-                    sh 'cd /app && docker-compose up -d'
+                    sh 'cd preprod-vagrant && vagrant ssh -c "cd /app && sudo docker-compose up -d"'
                 }
             }
         }
