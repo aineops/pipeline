@@ -89,7 +89,7 @@ pipeline {
                             fi
                             echo 'En attente des conteneurs... Reste \$MAX_WAIT secondes.'
                             sleep \$WAIT_INTERVAL
-                            MAX_WAIT=\$((\$MAX_WAIT-\$WAIT_INTERVAL))
+                            MAX_WAIT=\$((MAX_WAIT-WAIT_INTERVAL))
                         done
                         if [ \$MAX_WAIT -le 0 ]; then
                             echo 'Timeout atteint. Tous les conteneurs ne sont pas up and running.'
