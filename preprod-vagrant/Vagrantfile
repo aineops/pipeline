@@ -2,9 +2,17 @@ Vagrant.configure("2") do |config|
   config.vm.define "preprod-box" do |preprod|
     preprod.vm.box = "ubuntu/xenial64"
     preprod.vm.hostname = "preprod-box"
-    
+    preprod.vm.network "forwarded_port", guest: 83, host: 8383
+    preprod.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+      vb.gui = true
+    end
+
     # Configuration SSH pour rester connecté
     preprod.ssh.shell = "bash -c 'BASH_ENV=/etc/profile exec bash'"
+    preprod.ssh.keep_alive = true
+    preprod.ssh.forward_agent = true
 
     config.vm.provision "shell", inline: <<-SHELL
       # Mettre à jour les paquets
@@ -12,6 +20,9 @@ Vagrant.configure("2") do |config|
 
       # Installer Java JDK
       sudo apt-get install -y openjdk-17-jdk 
+
+      # Installer xfce et VirtualBox additions
+      sudo apt-get install -y xfce4 virtualbox-guest-dkms virtualbox-guest-utils virtualbox-guest-x11
 
       # Installer Docker
       sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
@@ -25,6 +36,7 @@ Vagrant.configure("2") do |config|
       sudo chmod +x /usr/local/bin/docker-compose
 
       # Créer un dossier 'app' et donner les autorisations nécessaires
+      sudo rm -rf /app
       sudo mkdir /app
       sudo chmod -R 777 /app
     SHELL

@@ -4,12 +4,14 @@ pipeline {
     stages {
         stage('Checkout Pipeline Repo') {
             steps {
+                echo 'Démarrage du checkout du répertoire de pipeline...'
                 git 'https://github.com/HoshEnder/pipeline.git'
             }
         }
 
         stage('Initial Setup') {
             steps {
+                echo 'Initialisation de la VM...'
                 script {
                     sh 'cd dev-vagrant && vagrant up'
                 }
@@ -18,94 +20,71 @@ pipeline {
 
         stage('Setup Application in Dev/QA Environment') {
             steps {
+                echo 'Configuration de l’application dans l’environnement Dev/QA...'
                 script {
-
-                    // Remplacer par le script pour se connecter à la VM dev-qa-box et cloner le dépôt
                     sh 'cd dev-vagrant && vagrant ssh -c "sudo git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
-
-                    // // Utiliser le script pour se connecter à la VM dev-qa-box et cloner le dépôt
-                    // sh 'git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app'
                 }
             }
         }
-        stage('Build and Unit Test in Dev/QA') {
+
+        stage('Build and Conditional Deploy in Dev/QA') {
             steps {
+                echo 'Démarrage des étapes de build et de déploiement conditionnel...'
                 script {
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo ./mvnw clean package"'
-                    echo 'Build Maven et tests unitaires terminés.'
-                    
                     def services = ['spring-petclinic-admin-server', 'spring-petclinic-api-gateway', 
                                     'spring-petclinic-config-server', 'spring-petclinic-customers-service', 
                                     'spring-petclinic-discovery-server', 'spring-petclinic-vets-service', 
                                     'spring-petclinic-visits-service']
 
-                    def jarsFound = false // Indicateur pour vérifier si au moins un fichier JAR est trouvé
+                    echo 'Téléchargement du script Python avant de lancer les builds'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/dev-vagrant/deploy_service.py"'
 
-                    services.each { service ->
-                        def jarPath = "/app/${service}/target/${service}-*.jar" // Recherche de n'importe quelle version de fichier JAR
-                        def maxWait = 120 // Délai d'attente maximal en secondes
-                        def waitInterval = 10 // Intervalles de vérification en secondes
+                    services.each { mavenService ->
+                        def dockerService = mavenService.replace('spring-petclinic-', '')
+                        echo "Traitement de ${mavenService}, service Docker correspondant : ${dockerService}"
 
-                        echo "Vérification de la présence du fichier JAR pour ${service}..."
-                        while (true) {
-                            def jarExists = sh(script: "cd dev-vagrant && vagrant ssh -c '[ -f ${jarPath} ] && echo true || echo false'", returnStatus: true)
-                            if (jarExists == 0) {
-                                def jarFileName = sh(script: "cd dev-vagrant && vagrant ssh -c 'ls ${jarPath}'", returnStdout: true).trim()
-                                echo "Fichier JAR trouvé pour ${service}: ${jarFileName}"
-                                jarsFound = true // Au moins un fichier JAR a été trouvé
-                                break
-                            }
-                            if (maxWait <= 0) {
-                                error "Le fichier JAR pour ${service} est manquant après le temps d'attente maximal."
-                            }
-                            sleep(waitInterval)
-                            maxWait -= waitInterval
+                        def buildCmd = "cd dev-vagrant && vagrant ssh -c 'cd /app && sudo ./mvnw clean package -pl ${mavenService} -am'"
+                        sh(buildCmd)
+
+                        def jarExistsCmd = "cd dev-vagrant && vagrant ssh -c '[ -f /app/${mavenService}/target/*.jar ] && echo true || echo false'"
+                        if (sh(script: jarExistsCmd, returnStatus: true) == 0) {
+                            echo "Déploiement du service Docker : ${dockerService}"
+                            sh "cd dev-vagrant && vagrant ssh -c 'cd /app && python3 deploy_service.py ${dockerService}'"
+                        } else {
+                            echo "Échec du build pour ${mavenService}, déploiement de ${dockerService} ignoré."
                         }
                     }
-
-                    // Si aucun fichier JAR n'est trouvé, afficher les 10 dernières lignes de la sortie de la construction
-                    if (!jarsFound) {
-                        echo "Aucun fichier JAR trouvé. Dernières 10 lignes de la sortie de la construction :"
-                        def lastLines = sh(script: "cd dev-vagrant && vagrant ssh -c 'tail -n 10 /app/mvn-output.log'", returnStdout: true)
-                        echo lastLines
-                    }
                 }
             }
         }
-        stage('Deploy to Dev/QA') {
+
+        stage('Verify Application Accessibility') {
             steps {
+                echo 'Vérification de l’accessibilité de l’application...'
                 script {
-                    // Transférer le script sur la VM et l'exécuter
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/dev-vagrant/services_up.py"'
-                    def scriptOutput = sh(script: 'cd dev-vagrant && vagrant ssh -c "cd /app && python3 services_up.py"', returnStdout: true).trim()
-                    echo scriptOutput
+                    def appUrl = "http://localhost:8282"
+                    sh "curl --fail --silent --head ${appUrl} || exit 1"
+                    echo "Application accessible à ${appUrl}"
                 }
             }
         }
-
 
         stage('Download & Run Selenium Tests') {
             steps {
+                echo 'Téléchargement et exécution des tests Selenium...'
                 script {
-                    // Télécharger le fichier tests.py depuis le référentiel GitHub
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py"'
-
-                    // Exécuter les tests Selenium dans l'environnement Dev/QA
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo python3 tests.py"'
-                    def seleniumOutput = sh(script: 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo python3 tests.py"', returnStdout: true).trim()
+                    def seleniumTestCmd = 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/tests.py && sudo python3 tests.py"'
+                    def seleniumOutput = sh(script: seleniumTestCmd, returnStdout: true).trim()
                     echo seleniumOutput
-                     // Analyser les rapports de test XML
-                    junit 'test-reports/*.xml'
                 }
             }
         }
 
-
         stage('Setup Application in Preprod Environment') {
             steps {
+                echo 'Configuration de l’application dans l’environnement de préproduction...'
                 script {
                     sh 'cd preprod-vagrant && vagrant up'
-                    // Cloner le dépôt de l'application dans l'environnement de préproduction
                     sh 'cd preprod-vagrant && vagrant ssh -c "sudo git clone https://github.com/spring-petclinic/spring-petclinic-microservices.git /app"'
                 }
             }
@@ -113,9 +92,8 @@ pipeline {
 
         stage('Deploy to Preprod') {
             steps {
+                echo 'Déploiement dans l’environnement de préproduction...'
                 script {
-
-                    // Déployer dans l'environnement de préproduction
                     sh 'cd preprod-vagrant && vagrant ssh -c "cd /app && sudo docker-compose up -d"'
                 }
             }
@@ -124,21 +102,26 @@ pipeline {
 
     post {
         always {
-            // Nettoyer, par exemple arrêter les VMs Vagrant
+            echo 'Nettoyage post-exécution et publication des rapports Selenium...'
             script {
-                sh 'cd dev-vagrant && vagrant halt'
-                sh 'cd preprod-vagrant && vagrant halt'
+                sh 'cd dev-vagrant && vagrant destroy -f'
+                sh 'cd preprod-vagrant && vagrant destroy -f'
             }
+            
+            publishHTML(target: [
+                allowMissing: false,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: '/home/a/jen_proj/Selenium',
+                reportFiles: 'index.html', // Assurez-vous que ce fichier existe dans le dossier des rapports
+                reportName: "Rapport Selenium HTML"
+            ])
         }
         success {
             echo "Le pipeline a réussi !"
         }
         failure {
             echo "Le pipeline a échoué !"
-            script {
-                sh 'cd dev-vagrant && vagrant halt'
-                sh 'cd preprod-vagrant && vagrant halt'
-            }
         }
     }
 }
