@@ -5,9 +5,8 @@ Vagrant.configure("2") do |config|
     dev.vm.network "forwarded_port", guest: 82, host: 8282
     dev.vm.hostname = "dev-qa-box"
     dev.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
-      vb.cpus = 2
-      vb.gui = true
+      vb.memory = "1028"
+      vb.cpus = 1
     end
 
     # Configuration SSH pour rester connecté
