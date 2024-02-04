@@ -9,11 +9,13 @@ from faker import Faker
 
 class SeleniumTest(unittest.TestCase):
     def setUp(self):
+        print("Démarrage du test Selenium...")
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
         self.wait = WebDriverWait(self.driver, 3)
         self.fake = Faker()
 
     def test_selenium_actions(self):
+        print("Test Selenium en cours...")
         driver = self.driver
         wait = self.wait
 
@@ -49,6 +51,7 @@ class SeleniumTest(unittest.TestCase):
 
     def tearDown(self):
         self.driver.quit()
+        print("Test Selenium terminé.")
 
 if __name__ == "__main__":
     import xmlrunner

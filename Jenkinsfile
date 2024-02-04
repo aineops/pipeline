@@ -75,28 +75,20 @@ pipeline {
         stage('Deploy to Dev/QA') {
             steps {
                 script {
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo docker-compose up -d"'
+                    def services = ['config-server', 'discovery-server', 'customers-service', 
+                                    'visits-service', 'vets-service', 'api-gateway', 'tracing-server', 
+                                    'admin-server', 'grafana-server', 'prometheus-server', 'mysql-server']
 
-                    // Attendre que tous les conteneurs soient "up and running"
-                    sh '''
-                        cd dev-vagrant && vagrant ssh -c "
-                        MAX_WAIT=120  # Maximum wait time in seconds
-                        WAIT_INTERVAL=10  # Interval to wait between checks in seconds
-                        while [ \$MAX_WAIT -gt 0 ]; do
-                            if docker-compose ps | grep -q '(healthy)'; then
-                                echo 'Tous les conteneurs sont en état healthy.'
-                                break
-                            fi
-                            echo 'En attente des conteneurs... Reste \$MAX_WAIT secondes.'
-                            sleep \$WAIT_INTERVAL
-                            MAX_WAIT=\$((MAX_WAIT-WAIT_INTERVAL))
-                        done
-                        if [ \$MAX_WAIT -le 0 ]; then
-                            echo 'Timeout atteint. Tous les conteneurs ne sont pas up and running.'
-                            exit 1
-                        fi
-                        "
-                    '''
+                    // Exécution parallèle pour démarrer chaque service Docker
+                    parallel services.collectEntries {
+                        ["Démarrage ${it}": {
+                            sh "cd dev-vagrant && vagrant ssh -c 'cd /app && sudo docker-compose up -d ${it}'"
+                        }]
+                    }
+
+                    // Télécharger et exécuter le script de vérification
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/check_containers.py"'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && bash check_containers.sh"'
                 }
             }
         }
@@ -109,6 +101,10 @@ pipeline {
 
                     // Exécuter les tests Selenium dans l'environnement Dev/QA
                     sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo python3 tests.py"'
+                    def seleniumOutput = sh(script: 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo python3 tests.py"', returnStdout: true).trim()
+                    echo seleniumOutput
+                     // Analyser les rapports de test XML
+                    junit 'test-reports/*.xml'
                 }
             }
         }
