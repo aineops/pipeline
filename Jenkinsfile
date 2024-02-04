@@ -75,23 +75,14 @@ pipeline {
         stage('Deploy to Dev/QA') {
             steps {
                 script {
-                    def services = ['config-server', 'discovery-server', 'customers-service', 
-                                    'visits-service', 'vets-service', 'api-gateway', 'tracing-server', 
-                                    'admin-server', 'grafana-server', 'prometheus-server', 'mysql-server']
-
-                    // Exécution parallèle pour démarrer chaque service Docker
-                    parallel services.collectEntries {
-                        ["Démarrage ${it}": {
-                            sh "cd dev-vagrant && vagrant ssh -c 'cd /app && sudo docker-compose up -d ${it}'"
-                        }]
-                    }
-
-                    // Télécharger et exécuter le script de vérification
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/check_containers.py"'
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && bash check_containers.sh"'
+                    // Transférer le script sur la VM et l'exécuter
+                    sh 'cd dev-vagrant && vagrant scp services_up.py /app/services_up.py'
+                    def scriptOutput = sh(script: 'cd dev-vagrant && vagrant ssh -c "cd /app && python3 services_up.py"', returnStdout: true).trim()
+                    echo scriptOutput
                 }
             }
         }
+
 
         stage('Download & Run Selenium Tests') {
             steps {
