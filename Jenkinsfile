@@ -76,7 +76,7 @@ pipeline {
             steps {
                 script {
                     // Transférer le script sur la VM et l'exécuter
-                    sh 'cd dev-vagrant && vagrant scp services_up.py /app/services_up.py'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/dev-vagrant/services_up.py"'
                     def scriptOutput = sh(script: 'cd dev-vagrant && vagrant ssh -c "cd /app && python3 services_up.py"', returnStdout: true).trim()
                     echo scriptOutput
                 }
