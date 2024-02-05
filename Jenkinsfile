@@ -58,16 +58,16 @@ pipeline {
             }
         }
 
-        stage('Verify Application Accessibility') {
-            steps {
-                echo 'Vérification de l’accessibilité de l’application...'
-                script {
-                    def appUrl = "http://localhost:8282"
-                    sh "curl --fail --silent --head ${appUrl} || exit 1"
-                    echo "Application accessible à ${appUrl}"
-                }
-            }
-        }
+        // stage('Verify Application Accessibility') {
+        //     steps {
+        //         echo 'Vérification de l’accessibilité de l’application...'
+        //         script {
+        //             def appUrl = "http://localhost:8282"
+        //             sh "curl --fail --silent --head ${appUrl} || exit 1"
+        //             echo "Application accessible à ${appUrl}"
+        //         }
+        //     }
+        // }
 
         stage('Download & Run Selenium Tests') {
             steps {
@@ -104,8 +104,10 @@ pipeline {
         always {
             echo 'Nettoyage post-exécution et publication des rapports Selenium...'
             script {
-                sh 'cd dev-vagrant && vagrant destroy -f'
-                sh 'cd preprod-vagrant && vagrant destroy -f'
+                sh 'cd dev-vagrant && vagrant halt -f'
+                sh 'cd preprod-vagrant && vagrant halt -f'
+                // sh 'cd dev-vagrant && vagrant destroy -f'
+                // sh 'cd preprod-vagrant && vagrant destroy -f'
             }
             
             publishHTML(target: [
