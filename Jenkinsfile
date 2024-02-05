@@ -37,7 +37,7 @@ pipeline {
                                     'spring-petclinic-visits-service']
 
                     echo 'Téléchargement du script Python avant de lancer les builds'
-                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/dev-vagrant/deploy_service.py"'
+                    sh 'cd dev-vagrant && vagrant ssh -c "cd /app && sudo curl -LJO https://github.com/HoshEnder/pipeline/raw/master/dev-vagrant/services_up.py"'
 
                     services.each { mavenService ->
                         def dockerService = mavenService.replace('spring-petclinic-', '')
@@ -115,7 +115,7 @@ pipeline {
                 alwaysLinkToLastBuild: true,
                 keepAll: true,
                 reportDir: '/home/a/jen_proj/Selenium',
-                reportFiles: 'index.html', // Assurez-vous que ce fichier existe dans le dossier des rapports
+                reportFiles: 'index.html',
                 reportName: "Rapport Selenium HTML"
             ])
         }
